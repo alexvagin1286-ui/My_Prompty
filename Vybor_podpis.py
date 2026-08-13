@@ -1,0 +1,88 @@
+import fitz
+import os
+import glob
+import tkinter as tk
+from tkinter import ttk, messagebox
+
+def process_pdfs(selected_job, selected_name, custom_name):
+    # Определяем итоговое имя
+    final_name = custom_name if custom_name.strip() else selected_name
+    
+    output_dir = "processed_results"
+    if not os.path.exists(output_dir): os.makedirs(output_dir)
+
+    font_bold = "C:/Windows/Fonts/arialbd.ttf"
+    font_regular = "C:/Windows/Fonts/arial.ttf"
+    if not os.path.exists(font_bold): font_bold = font_regular
+
+    pdf_files = glob.glob("*.pdf")
+    pdf_files = [f for f in pdf_files if not f.startswith("READY_")]
+
+    if not pdf_files:
+        messagebox.showwarning("Внимание", "В папке нет PDF файлов для обработки!")
+        return
+
+    success_count = 0
+    for input_file in pdf_files:
+        try:
+            doc = fitz.open(input_file)
+            for page in doc:
+                page.insert_font(fontname="f_bold", fontfile=font_bold)
+                page.insert_font(fontname="f_reg", fontfile=font_regular)
+
+                # 1. RA.RU.311579
+                words = page.get_text("words")
+                for w in words:
+                    if w[4].strip().lower() == "лиц":
+                        page.insert_text(fitz.Point(w[2] + 5, w[3] - 2), "RA.RU.311579", fontsize=10, fontname="f_bold")
+
+                # 2. Должность (из выбора)
+                inst2 = page.search_for("должность")
+                if not inst2: inst2 = page.search_for("доджность")
+                for inst in inst2:
+                    page.insert_text(fitz.Point(inst.x0, inst.y0 - 10), selected_job, fontsize=8, fontname="f_reg")
+
+                # 3. Фамилия (из выбора или ручной ввод)
+                inst3 = page.search_for("фамилия")
+                if len(inst3) >= 2:
+                    target = inst3[1]
+                    page.insert_text(fitz.Point(target.x0, target.y0 - 10), final_name, fontsize=8, fontname="f_reg")
+
+            doc.save(os.path.join(output_dir, f"READY_{input_file}"))
+            doc.close()
+            success_count += 1
+        except Exception as e:
+            print(f"Ошибка в {input_file}: {e}")
+
+    messagebox.showinfo("Готово", f"Обработано файлов: {success_count}\nРезультаты в папке processed_results")
+
+# --- СОЗДАНИЕ ОКНА ---
+root = tk.Tk()
+root.title("Настройка подписи PDF")
+root.geometry("400x300")
+
+# Выбор должности
+tk.Label(root, text="Выберите должность:").pack(pady=(10, 0))
+job_var = tk.StringVar(value="Начальник отдела")
+job_cb = ttk.Combobox(root, textvariable=job_var, width=40)
+job_cb['values'] = ("Начальник отдела", "Зам. начальника отдела", "и. о. начальника отдела")
+job_cb.pack(pady=5)
+
+# Выбор фамилии
+tk.Label(root, text="Выберите фамилию:").pack(pady=(10, 0))
+name_var = tk.StringVar(value="В. С. Крылов")
+name_cb = ttk.Combobox(root, textvariable=name_var, width=40)
+name_cb['values'] = ("В. С. Крылов", "А. В. Червонецкая", "Бадашов Е. Я.")  # Добавлена новая позиция
+name_cb.pack(pady=5)
+
+# Ручной ввод фамилии
+tk.Label(root, text="ИЛИ введите вручную (если нет в списке):").pack(pady=(10, 0))
+custom_name_entry = tk.Entry(root, width=43)
+custom_name_entry.pack(pady=5)
+
+# Кнопка запуска
+btn_run = tk.Button(root, text="ОБРАБОТАТЬ ВСЕ PDF", command=lambda: process_pdfs(job_var.get(), name_var.get(), custom_name_entry.get()), 
+                    bg="green", fg="white", font=('Arial', 10, 'bold'), height=2)
+btn_run.pack(pady=20)
+
+root.mainloop()

@@ -1,0 +1,143 @@
+Sub CopyDataFromArshin()
+    Dim wsSector As Worksheet
+    Dim wsArshin As Worksheet
+    Dim selectedRange As Range
+    Dim sectorRange As Range
+    Dim startRow As Long
+    Dim endRow As Long
+    Dim arshinLastRow As Long
+    Dim rowSector As Long
+    Dim rowArshin As Long
+    Dim sectorE As Variant
+    Dim sectorG As Variant
+    Dim arshinE As Variant
+    Dim arshinG As Variant
+    Dim valueToCopy As Variant
+    Dim found As Boolean
+    Dim foundCount As Long
+    Dim notFoundCount As Long
+    
+    Debug.Print "--- Начало выполнения макроса ---"
+    
+    ' Получаем необходимые листы
+    On Error Resume Next
+    Set wsSector = ThisWorkbook.Sheets("Сектор 113")
+    Set wsArshin = ThisWorkbook.Sheets("АРШИН")
+    On Error GoTo 0
+    
+    If wsSector Is Nothing Then
+        MsgBox "Лист 'Сектор 113' не найден", vbCritical
+        Exit Sub
+    End If
+    
+    If wsArshin Is Nothing Then
+        MsgBox "Лист 'АРШИН' не найден", vbCritical
+        Exit Sub
+    End If
+    
+    Debug.Print "Листы получены успешно"
+    
+    ' Получаем выделенный диапазон на листе "Сектор 113"
+    If Not wsSector Is ActiveSheet Then
+        MsgBox "Перейдите на лист 'Сектор 113' и выделите диапазон строк", vbCritical
+        Exit Sub
+    End If
+    
+    Set selectedRange = Selection
+    Set sectorRange = Intersect(selectedRange, wsSector.UsedRange)
+    
+    If sectorRange Is Nothing Then
+        MsgBox "Не выделен диапазон строк на листе 'Сектор 113'", vbCritical
+        Exit Sub
+    End If
+    
+    ' Определяем диапазон строк для обработки
+    startRow = sectorRange.Row
+    endRow = sectorRange.Row + sectorRange.Rows.Count - 1
+    
+    Debug.Print "Диапазон строк для обработки: с " & startRow & " по " & endRow
+    
+    ' Определяем последнюю строку на листе АРШИН (по столбцу E)
+    arshinLastRow = wsArshin.Cells(wsArshin.Rows.Count, "E").End(xlUp).Row
+    
+    ' Если лист пустой, выходим
+    If arshinLastRow < 1 Then
+        MsgBox "Лист 'АРШИН' пустой", vbCritical
+        Exit Sub
+    End If
+    
+    Debug.Print "Последняя строка АРШИН: " & arshinLastRow
+    
+    ' Инициализируем счетчики
+    foundCount = 0
+    notFoundCount = 0
+    
+    ' Проходим по каждой строке выделенного диапазона на листе "Сектор 113"
+    Debug.Print "Начинаем обработку строк..."
+    
+    For rowSector = startRow To endRow
+        Debug.Print "--- Обработка строки " & rowSector & " на листе 'Сектор 113' ---"
+        
+        ' Получаем значения для сравнения с листа "Сектор 113"
+        sectorE = wsSector.Cells(rowSector, 5).Value ' Столбец E
+        sectorG = wsSector.Cells(rowSector, 7).Value ' Столбец G
+        
+        ' Проверяем на пустые значения и ошибки
+        If IsEmpty(sectorE) Or IsEmpty(sectorG) Or sectorE = "" Or sectorG = "" Then
+            Debug.Print "Пропущена строка " & rowSector & ": отсутствуют данные в E или G"
+            notFoundCount = notFoundCount + 1
+            GoTo NextRow
+        End If
+        
+        Debug.Print "Значения для поиска: E=" & sectorE & ", G=" & sectorG
+        
+        ' Ищем совпадение на листе "АРШИН"
+        found = False
+        
+        For rowArshin = 1 To arshinLastRow
+            ' Получаем значения для сравнения с листа "АРШИН"
+            arshinE = wsArshin.Cells(rowArshin, 5).Value ' Столбец E
+            arshinG = wsArshin.Cells(rowArshin, 7).Value ' Столбец G
+            
+            ' Проверяем на пустые значения перед сравнением
+            If IsEmpty(arshinE) Or IsEmpty(arshinG) Then
+                GoTo NextArshinRow
+            End If
+            
+            ' Проверяем совпадение (учитываем разные типы данных)
+            If CStr(arshinE) = CStr(sectorE) And CStr(arshinG) = CStr(sectorG) Then
+                ' Копируем содержимое столбца K листа "АРШИН" в столбец R листа "Сектор 113"
+                valueToCopy = wsArshin.Cells(rowArshin, 11).Value ' Столбец K
+                wsSector.Cells(rowSector, 18).Value = valueToCopy ' Столбец R
+                
+                Debug.Print "Найдено совпадение! Строка АРШИН: " & rowArshin
+                Debug.Print "Копируем значение '" & valueToCopy & "' из K" & rowArshin & " в R" & rowSector
+                
+                found = True
+                foundCount = foundCount + 1
+                Exit For ' Прерываем поиск после первого совпадения
+            End If
+            
+NextArshinRow:
+        Next rowArshin
+        
+        If Not found Then
+            Debug.Print "Не найдено совпадение для строки " & rowSector
+            notFoundCount = notFoundCount + 1
+        End If
+        
+NextRow:
+        Debug.Print "--- Завершена обработка строки " & rowSector & " ---"
+    Next rowSector
+    
+    Debug.Print "--- Макрос завершен успешно ---"
+    Debug.Print "Результаты: найдено " & foundCount & " совпадений, не найдено " & notFoundCount
+    
+    ' Показываем результаты пользователю
+    MsgBox "Макрос завершен успешно!" & vbCrLf & _
+           "Найдено совпадений: " & foundCount & vbCrLf & _
+           "Не найдено: " & notFoundCount, vbInformation
+End Sub
+
+
+

@@ -1,0 +1,232 @@
+(function() {
+    try {
+        console.log("=== МАКРОС С РУЧНЫМ ВВОДОМ ДИАПАЗОНА ===");
+        
+        // Получаем необходимые листы
+        const sheetSector = Api.GetSheet("Сектор 113");
+        const sheetArshin = Api.GetSheet("АРШИН");
+        
+        if (!sheetSector) {
+            throw new Error("Лист 'Сектор 113' не найден");
+        }
+        
+        if (!sheetArshin) {
+            throw new Error("Лист 'АРШИН' не найден");
+        }
+        
+        // ЗАПРОС ДИАПАЗОНА СТРОК ОТ ПОЛЬЗОВАТЕЛЯ
+        let startRow, endRow;
+        
+        // Пытаемся использовать prompt для ввода
+        if (typeof prompt !== 'undefined') {
+            startRow = parseInt(prompt("Введите начальную строку для обработки:", "6528"));
+            endRow = parseInt(prompt("Введите конечную строку для обработки:", "6530"));
+        } else {
+            // Альтернативный способ для OnlyOffice
+            console.log("Используем тестовый диапазон: 6528-6530");
+            startRow = 6528;
+            endRow = 6530;
+        }
+        
+        // Проверка введенных данных
+        if (!startRow || !endRow || isNaN(startRow) || isNaN(endRow)) {
+            throw new Error("Неверно указан диапазон строк");
+        }
+        
+        if (startRow > endRow) {
+            throw new Error("Начальная строка не может быть больше конечной");
+        }
+        
+        const rowCount = endRow - startRow + 1;
+        
+        // ДИАГНОСТИКА ВВЕДЕННОГО ДИАПАЗОНА
+        console.log("=== ДИАГНОСТИКА ВВЕДЕННОГО ДИАПАЗОНА ===");
+        
+        let diagnosticInfo = "Диагностика введенного диапазона:\n\n";
+        diagnosticInfo += `Начальная строка: ${startRow}\n`;
+        diagnosticInfo += `Конечная строка: ${endRow}\n`;
+        diagnosticInfo += `Всего строк: ${rowCount}\n\n`;
+        
+        // Проверяем данные в указанном диапазоне
+        let dataRows = 0;
+        for (let row = startRow; row <= Math.min(startRow + 10, endRow); row++) {
+            const cellE = sheetSector.GetRange("E" + row).GetValue();
+            const cellG = sheetSector.GetRange("G" + row).GetValue();
+            
+            diagnosticInfo += `Строка ${row}: E='${cellE}', G='${cellG}'\n`;
+            
+            if (cellE && cellG) {
+                dataRows++;
+            }
+        }
+        
+        diagnosticInfo += `\nСтрок с данными (первые 10): ${dataRows}\n`;
+        
+        console.log(diagnosticInfo);
+        
+        // ДИАГНОСТИКА ЛИСТА АРШИН
+        console.log("=== ДИАГНОСТИКА ЛИСТА АРШИН ===");
+        
+        let arshinDataCount = 0;
+        let arshinDiagnostic = "Диагностика листа АРШИН:\n\n";
+        
+        // Проверяем первые 50 строк АРШИН для диагностики
+        for (let row = 1; row <= 50; row++) {
+            const eVal = sheetArshin.GetRange("E" + row).GetValue();
+            const gVal = sheetArshin.GetRange("G" + row).GetValue();
+            const kVal = sheetArshin.GetRange("K" + row).GetValue();
+            
+            if (eVal || gVal) {
+                arshinDataCount++;
+                arshinDiagnostic += `Строка ${row}: E='${eVal}', G='${gVal}', K='${kVal}'\n`;
+            }
+        }
+        
+        arshinDiagnostic += `\nВсего строк с данными в АРШИН (первые 50): ${arshinDataCount}\n`;
+        arshinDiagnostic += `Будет проверено: 2000 строк\n`;
+        
+        console.log(arshinDiagnostic);
+        
+        // СВОДНАЯ ИНФОРМАЦИЯ И ПОДТВЕРЖДЕНИЕ
+        const summaryMessage = 
+            "СВОДКА ПЕРЕД ВЫПОЛНЕНИЕМ:\n\n" +
+            "Сектор 113:\n" +
+            `- Диапазон строк: ${startRow}-${endRow}\n` +
+            `- Всего строк: ${rowCount}\n` +
+            `- Строк с данными: ${dataRows} (из первых 10)\n\n` +
+            "АРШИН:\n" +
+            `- Будет проверено: 2000 строк\n` +
+            `- Найдено данных в первых 50 строках: ${arshinDataCount}\n\n` +
+            "ВЫПОЛНИТЬ МАКРОС?";
+        
+        console.log(summaryMessage);
+        
+        let userConfirmed = false;
+        
+        // Запрос подтверждения
+        if (typeof confirm !== 'undefined') {
+            userConfirmed = confirm(summaryMessage);
+        } else if (typeof alert !== 'undefined') {
+            alert(summaryMessage + "\n\nЗакройте это окно и макрос продолжится автоматически.");
+            userConfirmed = true;
+        } else {
+            userConfirmed = true;
+        }
+        
+        if (!userConfirmed) {
+            console.log("Макрос прерван пользователем");
+            if (typeof Api.ShowMessage === 'function') {
+                Api.ShowMessage("Макрос прерван");
+            }
+            return;
+        }
+        
+        console.log("Пользователь подтвердил выполнение. Начинаем обработку...");
+        
+        // ОБРАБОТКА ДАННЫХ
+        const arshinLastRow = 2000; // Проверяем 2000 строк в АРШИН
+        
+        // Инициализируем счетчики
+        let foundCount = 0;
+        let notFoundCount = 0;
+        let emptyCount = 0;
+        let processedCount = 0;
+        
+        console.log("=== НАЧАЛО ОБРАБОТКИ ===");
+        
+        // Проходим по каждой строке указанного диапазона
+        for (let rowSector = startRow; rowSector <= endRow; rowSector++) {
+            processedCount++;
+            console.log(`Обработка ${processedCount}/${rowCount}: строка ${rowSector}`);
+            
+            // Получаем значения из текущей строки на Сектор 113
+            const sectorE = sheetSector.GetRange("E" + rowSector).GetValue();
+            const sectorG = sheetSector.GetRange("G" + rowSector).GetValue();
+            
+            // Пропускаем пустые строки
+            if (!sectorE || !sectorG) {
+                console.log("  ↷ Пропущена - пустые данные в E или G");
+                emptyCount++;
+                continue;
+            }
+            
+            // Ищем совпадение на листе АРШИН (2000 строк)
+            let found = false;
+            let foundArshinRow = 0;
+            let valueToCopy = null;
+            
+            for (let rowArshin = 1; rowArshin <= arshinLastRow; rowArshin++) {
+                // Получаем значения из текущей строки на АРШИН
+                const arshinE = sheetArshin.GetRange("E" + rowArshin).GetValue();
+                const arshinG = sheetArshin.GetRange("G" + rowArshin).GetValue();
+                
+                // Пропускаем пустые строки в АРШИН
+                if (!arshinE || !arshinG) continue;
+                
+                // Сравниваем значения
+                const eMatch = String(sectorE) === String(arshinE);
+                const gMatch = String(sectorG) === String(arshinG);
+                
+                if (eMatch && gMatch) {
+                    found = true;
+                    foundArshinRow = rowArshin;
+                    valueToCopy = sheetArshin.GetRange("K" + rowArshin).GetValue();
+                    
+                    // ОТЛАДОЧНАЯ ИНФОРМАЦИЯ ТОЛЬКО ДЛЯ СТРОКИ 6528
+                    if (rowSector === 6528) {
+                        console.log("--- ОТЛАДКА СТРОКИ 6528 ---");
+                        console.log("Сектор 113 строка 6528: E='" + sectorE + "', G='" + sectorG + "'");
+                        console.log("АРШИН строка " + foundArshinRow + ": E='" + arshinE + "', G='" + arshinG + "', K='" + valueToCopy + "'");
+                        console.log("✓ СОВПАДЕНИЕ НАЙДЕНО!");
+                    }
+                    break;
+                }
+            }
+            
+            if (found) {
+                // Копируем значение из K в R
+                sheetSector.GetRange("R" + rowSector).SetValue(valueToCopy);
+                
+                console.log(`  ✓ Найдено в АРШИН строка ${foundArshinRow}, скопировано: '${valueToCopy}'`);
+                
+                foundCount++;
+            } else {
+                console.log(`  ✗ Совпадение не найдено в АРШИН`);
+                notFoundCount++;
+            }
+        }
+        
+        // ФИНАЛЬНЫЕ РЕЗУЛЬТАТЫ
+        console.log("=== МАКРОС ЗАВЕРШЕН ===");
+        
+        const finalResults = 
+            "МАКРОС ЗАВЕРШЕН\n\n" +
+            "РЕЗУЛЬТАТЫ ОБРАБОТКИ:\n" +
+            `Диапазон: ${startRow}-${endRow}\n` +
+            `Обработано строк: ${rowCount}\n` +
+            `Найдено совпадений: ${foundCount}\n` +
+            `Не найдено: ${notFoundCount}\n` +
+            `Пустых строк: ${emptyCount}\n\n` +
+            `Эффективность: ${((foundCount / rowCount) * 100).toFixed(1)}%`;
+        
+        console.log(finalResults);
+        
+        // Показываем результаты пользователю
+        if (typeof Api.ShowMessage === 'function') {
+            Api.ShowMessage(finalResults);
+        } else if (typeof alert !== 'undefined') {
+            alert(finalResults);
+        }
+        
+    } catch (error) {
+        console.error("Ошибка выполнения макроса: " + error.message);
+        
+        const errorMessage = "ОШИБКА ВЫПОЛНЕНИЯ МАКРОСА:\n" + error.message;
+        
+        if (typeof Api.ShowMessage === 'function') {
+            Api.ShowMessage(errorMessage);
+        } else if (typeof alert !== 'undefined') {
+            alert(errorMessage);
+        }
+    }
+})();
